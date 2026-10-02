@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
 
 CREATE TABLE IF NOT EXISTS metric_events (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  event_type ENUM('confirmed','declined') NOT NULL,
+  event_type ENUM('confirmed','declined','cancelled') NOT NULL,
   reason VARCHAR(40) NOT NULL,
   show_id CHAR(36) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

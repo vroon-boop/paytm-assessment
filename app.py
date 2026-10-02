@@ -293,10 +293,15 @@ def cancel(reservation_id):
             if not reservation:
                 return fail("reservation not found", 404)
             if reservation["status"] == "cancelled":
+                if cur.rowcount:
+                    cur.execute("INSERT INTO metric_events (event_type,reason,show_id) VALUES ('cancelled','cancelled',%s)",(reservation["show_id"],))
                 conn.commit()
                 return jsonify({"reservation_id": reservation_id, "status": "cancelled"})
             cur.execute("UPDATE seats SET status='available',reservation_id=NULL WHERE reservation_id=%s AND status='confirmed'", (reservation_id,))
             cur.execute("UPDATE reservations SET status='cancelled' WHERE id=%s AND status='confirmed'", (reservation_id,))
+            if cur.rowcount:
+                cur.execute("INSERT INTO metric_events (event_type,reason,show_id) VALUES ('cancelled','cancelled',%s)",
+                            (reservation["show_id"],))
         conn.commit()
         return jsonify({"reservation_id": reservation_id, "status": "cancelled"})
     except Exception:
@@ -311,12 +316,16 @@ def metrics():
         with get_db().cursor() as cur:
             cur.execute("SELECT reason,COUNT(*) AS n FROM metric_events WHERE event_type='confirmed' GROUP BY reason")
             confirmed = sum(row["n"] for row in cur.fetchall())
+            cur.execute("SELECT COUNT(*) AS n FROM metric_events WHERE event_type='cancelled'")
+            cancelled = cur.fetchone()["n"]
             cur.execute("SELECT reason,COUNT(*) AS n FROM metric_events WHERE event_type='declined' GROUP BY reason")
             declined = {row["reason"]: row["n"] for row in cur.fetchall()}
             cur.execute("SELECT show_id,status,COUNT(*) AS n FROM seats GROUP BY show_id,status")
             gauges = cur.fetchall()
         lines = ["# HELP reservations_confirmed_total Confirmed reservation operations.",
                  "# TYPE reservations_confirmed_total counter", f"reservations_confirmed_total {confirmed}",
+                 "# HELP reservations_cancelled_total Successfully cancelled reservations.",
+                 "# TYPE reservations_cancelled_total counter", f"reservations_cancelled_total {cancelled}",
                  "# HELP reservations_declined_total Declined reservation operations and idempotent replays by reason.",
                  "# TYPE reservations_declined_total counter"]
         for reason in ("seat-taken", "per-user-limit", "idempotent-replay", "idempotency-conflict", "seat-not-found", "reservation-contention"):
