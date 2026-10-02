@@ -229,8 +229,9 @@ def reserve(show_id):
                     reservation["replayed"] = True
                     return jsonify(reservation), 201
                 return fail("idempotency record is inconsistent", 500)
-            cur.execute("SELECT seat_name,status FROM seats WHERE show_id=%s AND seat_name IN (%s) ORDER BY seat_name FOR UPDATE" %
-                        ("%s", ",".join(["%s"] * len(requested))), (show_id, *requested))
+            seat_placeholders = ",".join(["%s"] * len(requested))
+            cur.execute(f"SELECT seat_name,status FROM seats WHERE show_id=%s AND seat_name IN ({seat_placeholders}) ORDER BY seat_name FOR UPDATE",
+                        (show_id, *requested))
             rows = cur.fetchall()
             if len(rows) != len(requested):
                 return domain_decline(conn, "seat-not-found", 409, show_id)
@@ -246,8 +247,8 @@ def reserve(show_id):
                         (reservation_id, show_id, user_id, show["price_paise"] * len(requested)))
             cur.executemany("INSERT INTO reservation_seats (reservation_id,show_id,seat_name) VALUES (%s,%s,%s)",
                             [(reservation_id, show_id, seat) for seat in requested])
-            cur.execute("UPDATE seats SET status='confirmed', reservation_id=%s WHERE show_id=%s AND seat_name IN (%s) AND status='available'" %
-                        ("%s", ",".join(["%s"] * len(requested))), (reservation_id, show_id, *requested))
+            cur.execute(f"UPDATE seats SET status='confirmed', reservation_id=%s WHERE show_id=%s AND seat_name IN ({seat_placeholders}) AND status='available'",
+                        (reservation_id, show_id, *requested))
             if cur.rowcount != len(requested):
                 conn.rollback()
                 # With the show lock this should not occur. If it does, report a domain conflict.
