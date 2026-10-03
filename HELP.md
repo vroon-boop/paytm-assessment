@@ -1,6 +1,6 @@
 # Running and testing the seat reservation API
 
-The API lives in `paytm/`. It is a Flask JSON service backed by MySQL.
+The API lives in `paytm/`. It is a Flask JSON service backed by PostgreSQL.
 
 ## Start the server
 
@@ -13,9 +13,9 @@ cd paytm
 docker compose up --build
 ```
 
-Compose starts MySQL and the API. The API container waits for MySQL, runs `init_db.py` to create the tables from `schema.sql`, then starts Gunicorn on port `8000`. Keep this terminal open; use a second terminal to run the curl commands below. Stop the services with `Ctrl+C`, then `docker compose down` when needed. The database is stored in a named volume and remains between restarts. To erase that local database and its data, run `docker compose down -v`.
+Compose starts PostgreSQL and the API. The API container waits for PostgreSQL, runs `init_db.py` to create the tables from `schema.sql`, then starts Gunicorn on port `8000`. Keep this terminal open; use a second terminal to run the curl commands below. Stop the services with `Ctrl+C`, then `docker compose down` when needed. The database is stored in a named volume and remains between restarts. To erase that local database and its data, run `docker compose down -v`.
 
-The local Compose credentials are for development only: admin token `local-admin-change-me`, user token secret `local-user-secret-change-me`, and MySQL password `local-seats-password`.
+The local Compose credentials are for development only: admin token `local-admin-change-me`, user token secret `local-user-secret-change-me`, and PostgreSQL password `local-seats-password`.
 
 Check that the API and database are up:
 
@@ -28,14 +28,14 @@ Both should return HTTP 200. `/healthz` checks the API process; `/readyz` checks
 
 ### Run without Docker
 
-You need Python 3.12+ and a MySQL 8 database. From `paytm/`, create and activate a virtual environment, install the dependencies, and set the DB credentials and API secrets to match your local MySQL configuration:
+You need Python 3.12+ and PostgreSQL. From `paytm/`, create and activate a virtual environment, install the dependencies, and set `DATABASE_URL` and the API secrets to match your PostgreSQL configuration:
 
 ```sh
 cd paytm
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-export DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=seats DB_USER=seats DB_PASSWORD='your-mysql-password'
+export DATABASE_URL='postgresql://seats:your-postgres-password@127.0.0.1:5432/seats'
 export ADMIN_TOKEN='local-admin-change-me'
 export USER_TOKEN_SECRET='local-user-secret-change-me'
 python init_db.py
@@ -46,7 +46,7 @@ The app listens on `http://localhost:8000` by default. Run `python init_db.py` o
 
 ## Create dummy data
 
-There is no separate seed-data command. Create a show using `POST /shows`; this inserts the show and all its seats as available in MySQL. `price_paise` is an integer amount in paise (for example, `25000` is ₹250.00), and `per_user_limit` cannot exceed the number of seats.
+There is no separate seed-data command. Create a show using `POST /shows`; this inserts the show and all its seats as available in PostgreSQL. `price_paise` is an integer amount in paise (for example, `25000` is ₹250.00), and `per_user_limit` cannot exceed the number of seats.
 
 Set the local admin token and create a sample show:
 

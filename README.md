@@ -1,16 +1,16 @@
 # Seat Reservation API
 
-Flask JSON API backed by MySQL. Allocation, idempotency, and the per-user seat cap are enforced in MySQL transactions. Reservations confirm immediately; their owner can cancel to release the seats.
+Flask JSON API backed by PostgreSQL. Allocation, idempotency, and the per-user seat cap are enforced in PostgreSQL transactions. Reservations confirm immediately; their owner can cancel to release the seats.
 
 ## Run locally
 
-Requirements: Python 3.12+, Flask, PyMySQL, and Gunicorn (declared in `requirements.txt`); Docker Compose and Docker are needed for the one-command container setup. This repository's implementation session did not install packages.
+Requirements: Python 3.12+, Flask, psycopg2, and Gunicorn (declared in `requirements.txt`); Docker Compose and Docker are needed for the one-command container setup.
 
 ```sh
 docker compose up --build
 ```
 
-The API is at `http://localhost:8000`. Local compose uses development-only credentials from `compose.yaml`; change them for any shared environment. `GET /healthz` checks process liveness, `GET /readyz` checks MySQL, and `GET /metrics` exposes Prometheus text metrics.
+The API is at `http://localhost:8000`. Local compose uses development-only credentials from `compose.yaml`; change them for any shared environment. `GET /healthz` checks process liveness, `GET /readyz` checks PostgreSQL, and `GET /metrics` exposes Prometheus text metrics.
 
 ## Authentication and API
 
@@ -53,6 +53,6 @@ The client creates a fresh two-seat show, sends concurrent requests from distinc
 
 ## Deployment and design notes
 
-- Follow [DEPLOYMENT.md](DEPLOYMENT.md) for Render deployment. The Blueprint deploys the Docker web service; you must supply a reachable external MySQL database because this app uses MySQL.
+- Follow [DEPLOYMENT.md](DEPLOYMENT.md) for Render deployment. The Blueprint provisions Render PostgreSQL and connects the Docker web service through `DATABASE_URL`.
 - [WRITEUP.md](WRITEUP.md) explains the locking protocol, idempotency, consistency choices, observability, and AI use.
 - The intended incremental commit subjects are recorded in [PLAN.md](PLAN.md). Local commit history is included in this checkout.

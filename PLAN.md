@@ -3,11 +3,11 @@
 ## Decisions
 
 - **Framework:** Python Flask, as requested.
-- **Database:** MySQL. Shows, seats, reservations, and idempotency records are relational. InnoDB transactions, row locks, foreign keys, and unique constraints make seat ownership and the per-user limit explicit.
+- **Database:** PostgreSQL. Shows, seats, reservations, and idempotency records are relational. PostgreSQL transactions, row locks, foreign keys, and unique constraints make seat ownership and the per-user limit explicit.
 - **Reservation policy:** all-or-nothing for multi-seat requests. If any requested seat is unavailable or the user cap would be exceeded, no seats are reserved.
 - **Reservation lifecycle:** reservations confirm immediately and owners can cancel. This provides an explicit release path without a payment/expiry workflow.
 - **Identity:** a signed bearer token determines user identity; body-supplied user IDs are ignored.
-- **Database driver:** PyMySQL is declared as a container runtime dependency. It was not installed in the implementation environment.
+- **Database driver:** psycopg2-binary is declared as a container runtime dependency. The app accepts `DATABASE_URL` for Render and other PostgreSQL providers.
 
 ## Incremental commits
 
@@ -25,6 +25,6 @@
 
 ## Deployment and verification constraints
 
-- Do not install pip packages or OS libraries in the development environment. Declare Flask, PyMySQL, and Gunicorn runtime requirements so the container can build during deployment.
+- Do not install pip packages or OS libraries in the development environment. Declare Flask, psycopg2-binary, and Gunicorn runtime requirements so the container can build during deployment.
 - Provide reproducible free-tier deployment steps and disclose account, capacity, and DNS prerequisites. Do not claim a live deployment absent cloud credentials and a public Git remote.
-- The local environment lacks Flask and PyMySQL, so only syntax and source review are possible without installing packages.
+- No live deployment or concurrency run is claimed without cloud credentials and a public Git remote.

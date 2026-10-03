@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import re
-import ssl
 import uuid
 from datetime import datetime, timezone
 
@@ -15,11 +14,11 @@ from flask import Flask, g, jsonify, request, Response
 from werkzeug.exceptions import HTTPException
 
 try:
-    import pymysql
-    from pymysql.cursors import DictCursor
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
 except ImportError:  # The app can be imported for tooling; database use reports a clear error.
-    pymysql = None
-    DictCursor = None
+    psycopg2 = None
+    RealDictCursor = None
 
 app = Flask(__name__)
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(message)s")
@@ -27,21 +26,20 @@ log = logging.getLogger("seat_service")
 
 
 def db_connect():
-    if pymysql is None:
-        raise RuntimeError("PyMySQL is required at runtime; install the declared requirements")
+    if psycopg2 is None:
+        raise RuntimeError("psycopg2 is required at runtime; install the declared requirements")
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return psycopg2.connect(database_url, connect_timeout=5, cursor_factory=RealDictCursor)
     required = ("DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME")
     missing = [key for key in required if not os.getenv(key)]
     if missing:
-        raise RuntimeError("Missing database configuration: " + ", ".join(missing))
-    tls_context = None
-    if os.getenv("DB_SSL_CA"):
-        tls_context = ssl.create_default_context(cafile=os.environ["DB_SSL_CA"])
-    return pymysql.connect(
-        host=os.environ["DB_HOST"], port=int(os.getenv("DB_PORT", "3306")),
+        raise RuntimeError("Set DATABASE_URL or all of: " + ", ".join(required))
+    return psycopg2.connect(
+        host=os.environ["DB_HOST"], port=int(os.getenv("DB_PORT", "5432")),
         user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
-        database=os.environ["DB_NAME"], charset="utf8mb4", autocommit=False,
-        connect_timeout=5, read_timeout=15, write_timeout=15,
-        cursorclass=DictCursor, ssl=tls_context,
+        dbname=os.environ["DB_NAME"], connect_timeout=5,
+        cursor_factory=RealDictCursor,
     )
 
 
@@ -211,7 +209,7 @@ def reserve(show_id):
             if not show:
                 return fail("show not found", 404)
             # One lock row per (show,user) serializes only that user's cap checks.
-            cur.execute("INSERT IGNORE INTO show_user_locks (show_id,user_id) VALUES (%s,%s)", (show_id, user_id))
+            cur.execute("INSERT INTO show_user_locks (show_id,user_id) VALUES (%s,%s) ON CONFLICT (show_id,user_id) DO NOTHING", (show_id, user_id))
             cur.execute("SELECT user_id FROM show_user_locks WHERE show_id=%s AND user_id=%s FOR UPDATE", (show_id, user_id))
             cur.execute("SELECT fingerprint,reservation_id FROM idempotency_keys WHERE user_id=%s AND show_id=%s AND idem_key=%s FOR UPDATE",
                         (user_id, show_id, idem))
@@ -264,7 +262,7 @@ def reserve(show_id):
                         "seats": requested, "amount_paise": show["price_paise"] * len(requested), "status": "confirmed"}), 201
     except Exception as error:
         conn.rollback()
-        if pymysql is not None and isinstance(error, pymysql.err.OperationalError) and error.args and error.args[0] in (1205, 1213):
+        if psycopg2 is not None and isinstance(error, psycopg2.Error) and error.pgcode in ("40P01", "40001", "55P03"):
             with conn.cursor() as cur:
                 cur.execute("INSERT INTO metric_events (event_type,reason,show_id) VALUES ('declined','reservation-contention',%s)", (show_id,))
             conn.commit()
@@ -286,15 +284,13 @@ def cancel(reservation_id):
             owner_row = cur.fetchone()
             if not owner_row:
                 return fail("reservation not found", 404)
-            cur.execute("INSERT IGNORE INTO show_user_locks (show_id,user_id) VALUES (%s,%s)", (owner_row["show_id"], user_id))
+            cur.execute("INSERT INTO show_user_locks (show_id,user_id) VALUES (%s,%s) ON CONFLICT (show_id,user_id) DO NOTHING", (owner_row["show_id"], user_id))
             cur.execute("SELECT user_id FROM show_user_locks WHERE show_id=%s AND user_id=%s FOR UPDATE", (owner_row["show_id"], user_id))
             cur.execute("SELECT show_id,status FROM reservations WHERE id=%s AND user_id=%s FOR UPDATE", (reservation_id, user_id))
             reservation = cur.fetchone()
             if not reservation:
                 return fail("reservation not found", 404)
             if reservation["status"] == "cancelled":
-                if cur.rowcount:
-                    cur.execute("INSERT INTO metric_events (event_type,reason,show_id) VALUES ('cancelled','cancelled',%s)",(reservation["show_id"],))
                 conn.commit()
                 return jsonify({"reservation_id": reservation_id, "status": "cancelled"})
             cur.execute("UPDATE seats SET status='available',reservation_id=NULL WHERE reservation_id=%s AND status='confirmed'", (reservation_id,))

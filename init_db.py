@@ -1,4 +1,4 @@
-"""Create the application tables from schema.sql using the configured MySQL DB."""
+"""Create or update the application tables from schema.sql in PostgreSQL."""
 from pathlib import Path
 
 from app import db_connect
