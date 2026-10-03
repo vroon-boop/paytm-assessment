@@ -53,6 +53,6 @@ The client creates a fresh two-seat show, sends concurrent requests from distinc
 
 ## Deployment and design notes
 
-- Follow [DEPLOYMENT.md](DEPLOYMENT.md) for the concrete free-tier deployment steps for this repo.
+- Follow [DEPLOYMENT.md](DEPLOYMENT.md) for Render deployment. The Blueprint deploys the Docker web service; you must supply a reachable external MySQL database because this app uses MySQL.
 - [WRITEUP.md](WRITEUP.md) explains the locking protocol, idempotency, consistency choices, observability, and AI use.
 - The intended incremental commit subjects are recorded in [PLAN.md](PLAN.md). Local commit history is included in this checkout.
