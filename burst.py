@@ -51,7 +51,7 @@ def main():
     secret = os.environ.get("USER_TOKEN_SECRET")
     if not admin or not secret:
         parser.error("set ADMIN_TOKEN and USER_TOKEN_SECRET")
-    show_status, show = call(base + "/shows", "POST", {"name": "burst-" + str(uuid.uuid4()), "seats": ["A1", "A2"], "price_paise": 25000},
+    show_status, show = call(base + "/shows", "POST", {"name": "burst-" + str(uuid.uuid4()), "seats": ["A1", "A2"], "price_paise": 25000, "per_user_limit": 2},
                              {"Authorization": "Bearer " + admin, "Content-Type": "application/json"})
     if show_status != 201:
         raise SystemExit("show creation failed: " + json.dumps(show))
